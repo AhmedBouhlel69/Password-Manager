@@ -1,3 +1,4 @@
 passwords.vault.kdf
+passwords.vault
 __pycache__/
 .pytest_cache/
