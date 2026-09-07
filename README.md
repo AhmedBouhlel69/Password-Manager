@@ -51,11 +51,22 @@ If PowerShell blocks activation, run the project with the virtual-environment in
 
 ## Run the Desktop App
 
+You can launch SecureVault in multiple ways:
+
+1. **Desktop Shortcut**: Double-click the **SecureVault** icon on your Windows Desktop.
+2. **Start Menu**: Press the Windows Key and search for **SecureVault**.
+3. **Silent Launcher**: Double-click `SecureVault.vbs` in the project root to run without any command prompt window.
+4. **Command Line**:
+   ```powershell
+   python main.py
+   ```
+
+To re-create or update your Desktop and Start Menu shortcuts at any time:
 ```powershell
-python main.py
+powershell -ExecutionPolicy Bypass -File .\scripts\create_shortcuts.ps1
 ```
 
-The application opens at the unlock screen. Use the create-vault flow for first-time setup, then unlock an existing vault. After unlock, the main window provides entry management, search, import, settings, pairing, copy, and manual lock actions.
+The application opens at the unlock screen (automatically pre-filling your last opened vault with immediate focus on the password field). After unlock, the main window provides full keyboard navigation (`Ctrl+F` to search, `Ctrl+N` to add, `Ctrl+C` to copy password, `Ctrl+Shift+C` to copy username, `Ctrl+L` to lock, `Enter` to edit, `Del` to delete).
 
 ## CLI Usage
 

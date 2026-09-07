@@ -1,8 +1,9 @@
 from typing import Dict, Any, List
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
                                QListWidgetItem, QLineEdit, QLabel, QPushButton, 
-                               QSplitter, QFormLayout, QTextBrowser)
-from PySide6.QtCore import Signal, Qt
+                               QSplitter, QFormLayout, QTextBrowser, QApplication)
+from PySide6.QtCore import Signal, Qt, QEvent
+from PySide6.QtGui import QShortcut, QKeySequence
 
 class VaultView(QWidget):
     entry_selected = Signal(str) # entry_id
@@ -29,12 +30,18 @@ class VaultView(QWidget):
         left_layout.setContentsMargins(0, 0, 0, 0)
         
         self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("Search...")
+        self.search_bar.setPlaceholderText("Search (Ctrl+F)...")
+        self.search_bar.setAccessibleName("Search vault entries")
+        self.search_bar.setAccessibleDescription("Filter password entries by site or username")
         self.search_bar.textChanged.connect(self.on_search)
         left_layout.addWidget(self.search_bar)
 
         self.list_widget = QListWidget()
+        self.list_widget.setAccessibleName("Vault entries list")
+        self.list_widget.setAccessibleDescription("List of saved credentials. Use arrow keys to select, Enter to edit, Delete to remove.")
         self.list_widget.itemSelectionChanged.connect(self.on_selection_changed)
+        self.list_widget.itemDoubleClicked.connect(lambda: self.edit_requested.emit(self.current_entry_id) if self.current_entry_id else None)
+        self.list_widget.installEventFilter(self)
         left_layout.addWidget(self.list_widget)
 
         splitter.addWidget(left_widget)
@@ -46,8 +53,10 @@ class VaultView(QWidget):
 
         # Toolbar for details
         toolbar_layout = QHBoxLayout()
-        self.edit_btn = QPushButton("Edit")
-        self.delete_btn = QPushButton("Delete")
+        self.edit_btn = QPushButton("Edit (Enter)")
+        self.edit_btn.setAccessibleName("Edit selected entry")
+        self.delete_btn = QPushButton("Delete (Del)")
+        self.delete_btn.setAccessibleName("Delete selected entry")
         self.edit_btn.clicked.connect(lambda: self.edit_requested.emit(self.current_entry_id) if self.current_entry_id else None)
         self.delete_btn.clicked.connect(lambda: self.delete_requested.emit(self.current_entry_id) if self.current_entry_id else None)
         toolbar_layout.addStretch()
@@ -69,6 +78,7 @@ class VaultView(QWidget):
         user_layout = QHBoxLayout()
         self.lbl_username = QLabel()
         self.copy_user_btn = QPushButton("Copy")
+        self.copy_user_btn.setAccessibleName("Copy username to clipboard")
         self.copy_user_btn.clicked.connect(lambda: self.copy_username_requested.emit(self.current_entry_id) if self.current_entry_id else None)
         user_layout.addWidget(self.lbl_username)
         user_layout.addWidget(self.copy_user_btn)
@@ -77,8 +87,10 @@ class VaultView(QWidget):
         pwd_layout = QHBoxLayout()
         self.lbl_password = QLabel("********")
         self.copy_pwd_btn = QPushButton("Copy Password")
+        self.copy_pwd_btn.setAccessibleName("Copy password to clipboard")
         self.copy_pwd_btn.clicked.connect(lambda: self.copy_password_requested.emit(self.current_entry_id) if self.current_entry_id else None)
         self.show_pwd_btn = QPushButton("Show")
+        self.show_pwd_btn.setAccessibleName("Toggle show or hide password")
         self.show_pwd_btn.setCheckable(True)
         self.show_pwd_btn.clicked.connect(self.toggle_password_display)
         pwd_layout.addWidget(self.lbl_password)
@@ -93,6 +105,7 @@ class VaultView(QWidget):
         
         self.right_layout.addWidget(QLabel("Notes:"))
         self.txt_notes = QTextBrowser()
+        self.txt_notes.setAccessibleName("Entry notes")
         self.right_layout.addWidget(self.txt_notes)
 
         self.lbl_meta = QLabel()
@@ -102,7 +115,36 @@ class VaultView(QWidget):
         splitter.addWidget(self.right_widget)
         splitter.setSizes([300, 500])
 
+        # Shortcuts
+        self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self.search_shortcut.activated.connect(self.search_bar.setFocus)
+
+        self.copy_pwd_shortcut = QShortcut(QKeySequence("Ctrl+C"), self)
+        self.copy_pwd_shortcut.activated.connect(self._handle_copy_pwd_shortcut)
+
+        self.copy_user_shortcut = QShortcut(QKeySequence("Ctrl+Shift+C"), self)
+        self.copy_user_shortcut.activated.connect(lambda: self.copy_username_requested.emit(self.current_entry_id) if self.current_entry_id else None)
+
         self.clear_details()
+
+    def eventFilter(self, obj, event):
+        if obj is self.list_widget and event.type() == QEvent.KeyPress:
+            if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+                if self.current_entry_id:
+                    self.edit_requested.emit(self.current_entry_id)
+                    return True
+            elif event.key() == Qt.Key_Delete:
+                if self.current_entry_id:
+                    self.delete_requested.emit(self.current_entry_id)
+                    return True
+        return super().eventFilter(obj, event)
+
+    def _handle_copy_pwd_shortcut(self):
+        focus = QApplication.focusWidget()
+        if isinstance(focus, (QLineEdit, QTextBrowser)) and focus.hasSelectedText():
+            return
+        if self.current_entry_id:
+            self.copy_password_requested.emit(self.current_entry_id)
 
     def set_entries(self, entries: List[Dict[str, Any]]):
         self.list_widget.clear()

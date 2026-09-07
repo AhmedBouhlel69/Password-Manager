@@ -4,6 +4,34 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Signal, Qt
 from src.ui.styles import get_stylesheet
 
+def _get_last_vault_path() -> str:
+    cfg_path = os.path.expanduser("~/.securevault_last_path")
+    if os.path.exists(cfg_path):
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                p = f.read().strip()
+                if os.path.exists(p):
+                    return p
+        except Exception:
+            pass
+    # Local fallback
+    local_vault = os.path.abspath("passwords.vault")
+    if os.path.exists(local_vault):
+        return local_vault
+    app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    app_vault = os.path.join(app_dir, "passwords.vault")
+    if os.path.exists(app_vault):
+        return app_vault
+    return ""
+
+def _save_last_vault_path(path: str):
+    try:
+        cfg_path = os.path.expanduser("~/.securevault_last_path")
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            f.write(path)
+    except Exception:
+        pass
+
 class UnlockDialog(QDialog):
     vault_created = Signal(str, str)
     vault_unlocked = Signal(str, str)
@@ -37,7 +65,17 @@ class UnlockDialog(QDialog):
         self.file_input = QLineEdit()
         self.file_input.setPlaceholderText("Select encrypted vault file (.vault)...")
         self.file_input.setReadOnly(True)
+        self.file_input.setAccessibleName("Encrypted vault file path")
+        self.file_input.setAccessibleDescription("Path to your encrypted vault database file")
+
+        # Auto-populate if available in unlock mode
+        if self.mode == 'unlock':
+            last_path = _get_last_vault_path()
+            if last_path:
+                self.file_input.setText(last_path)
+
         self.browse_btn = QPushButton("Browse")
+        self.browse_btn.setAccessibleName("Browse vault database file")
         self.browse_btn.clicked.connect(self.browse_file)
         file_layout.addWidget(self.file_input)
         file_layout.addWidget(self.browse_btn)
@@ -47,12 +85,16 @@ class UnlockDialog(QDialog):
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Master Password")
         self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setAccessibleName("Master password")
+        self.password_input.setAccessibleDescription("Enter master password to unlock your vault")
         self.password_input.textChanged.connect(self.on_password_changed)
+        self.password_input.returnPressed.connect(self.submit)
         
         pwd_layout = QHBoxLayout()
         pwd_layout.addWidget(self.password_input)
         self.toggle_pwd_btn = QPushButton("👁")
         self.toggle_pwd_btn.setCheckable(True)
+        self.toggle_pwd_btn.setAccessibleName("Toggle password visibility")
         self.toggle_pwd_btn.clicked.connect(self.toggle_password_visibility)
         pwd_layout.addWidget(self.toggle_pwd_btn)
         layout.addLayout(pwd_layout)
@@ -62,6 +104,8 @@ class UnlockDialog(QDialog):
             self.confirm_input = QLineEdit()
             self.confirm_input.setPlaceholderText("Confirm Password")
             self.confirm_input.setEchoMode(QLineEdit.Password)
+            self.confirm_input.setAccessibleName("Confirm master password")
+            self.confirm_input.returnPressed.connect(self.submit)
             layout.addWidget(self.confirm_input)
 
             self.strength_bar = QProgressBar()
@@ -78,6 +122,8 @@ class UnlockDialog(QDialog):
 
         # Action button
         self.action_btn = QPushButton("Create Vault" if self.mode == 'create' else "Unlock")
+        self.action_btn.setDefault(True)
+        self.action_btn.setAccessibleName("Submit unlock or create vault")
         self.action_btn.clicked.connect(self.submit)
         layout.addWidget(self.action_btn)
         
@@ -95,6 +141,9 @@ class UnlockDialog(QDialog):
         )
         self.import_btn.clicked.connect(lambda: self.start_import_flow())
         layout.addWidget(self.import_btn)
+
+        # Set default focus to password input for immediate typing
+        self.password_input.setFocus()
 
     def browse_file(self):
         if self.mode == 'create':
@@ -158,11 +207,13 @@ class UnlockDialog(QDialog):
             if pwd != self.confirm_input.text():
                 self.status_label.setText("Passwords do not match.")
                 return
+            _save_last_vault_path(path)
             self.vault_created.emit(path, pwd)
         else:
             if not os.path.exists(path):
                 self.status_label.setText("File not found.")
                 return
+            _save_last_vault_path(path)
             self.vault_unlocked.emit(path, pwd)
 
     def switch_mode(self):

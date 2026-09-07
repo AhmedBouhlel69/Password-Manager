@@ -1,6 +1,7 @@
+import os
 import datetime
 from PySide6.QtWidgets import (QMainWindow, QToolBar, QStatusBar, QMessageBox, QApplication)
-from PySide6.QtGui import QAction, QCloseEvent
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
 from PySide6.QtCore import Qt, QEvent
 from src.ui.vault_view import VaultView
 from src.ui.entry_editor import EntryEditorDialog
@@ -17,8 +18,17 @@ class MainWindow(QMainWindow):
         self.vault = vault
         self.session = session
         self.clipboard = clipboard
-        self.setWindowTitle("SecureVault")
+        self.setWindowTitle("SecureVault - Password Manager")
+        self.setAccessibleName("SecureVault Main Window")
         self.resize(900, 600)
+
+        # Set window icon
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        icon_path = os.path.join(base_dir, "assets", "icon.ico")
+        if not os.path.exists(icon_path):
+            icon_path = os.path.join(base_dir, "assets", "icon.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
 
         # Intercept events for session timeout
         QApplication.instance().installEventFilter(self)
@@ -31,32 +41,47 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
         file_menu = menubar.addMenu("File")
         import_act = QAction("Import Plaintext Notes...", self)
+        import_act.setShortcut(QKeySequence("Ctrl+I"))
+        import_act.setStatusTip("Import credentials from plaintext notes")
         import_act.triggered.connect(self.open_import_wizard)
         file_menu.addAction(import_act)
         file_menu.addSeparator()
+
         lock_act = QAction("Lock Vault", self)
+        lock_act.setShortcut(QKeySequence("Ctrl+L"))
+        lock_act.setStatusTip("Immediately lock the vault")
         lock_act.triggered.connect(self.lock_vault)
         file_menu.addAction(lock_act)
+
         exit_act = QAction("Exit", self)
+        exit_act.setShortcut(QKeySequence("Ctrl+Q"))
+        exit_act.setStatusTip("Exit the application")
         exit_act.triggered.connect(self.close)
         file_menu.addAction(exit_act)
 
         edit_menu = menubar.addMenu("Edit")
         add_act = QAction("Add Entry", self)
+        add_act.setShortcut(QKeySequence("Ctrl+N"))
+        add_act.setStatusTip("Add a new password entry")
         add_act.triggered.connect(self.add_entry)
         edit_menu.addAction(add_act)
 
         pair_act = QAction("📲 Pair iPhone (Bluetooth 2FA)...", self)
+        pair_act.setShortcut(QKeySequence("Ctrl+B"))
+        pair_act.setStatusTip("Pair iPhone for Bluetooth 2-factor authentication")
         pair_act.triggered.connect(self.open_pairing_dialog)
         edit_menu.addAction(pair_act)
 
         settings_act = QAction("Settings", self)
+        settings_act.setShortcut(QKeySequence("Ctrl+,"))
+        settings_act.setStatusTip("Open application settings")
         settings_act.triggered.connect(self.open_settings)
         edit_menu.addAction(settings_act)
 
         help_menu = menubar.addMenu("Help")
         about_act = QAction("About", self)
-        about_act.triggered.connect(lambda: QMessageBox.about(self, "About", "SecureVault Password Manager"))
+        about_act.setShortcut(QKeySequence("F1"))
+        about_act.triggered.connect(lambda: QMessageBox.about(self, "About SecureVault", "SecureVault Password Manager\nA secure, local-first encrypted password manager with Bluetooth 2FA."))
         help_menu.addAction(about_act)
 
         # Toolbar

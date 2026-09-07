@@ -1,5 +1,7 @@
+import os
 import sys
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QIcon
 from src.ui.styles import get_stylesheet
 from src.ui.unlock_dialog import UnlockDialog
 from src.ui.main_window import MainWindow
@@ -9,7 +11,27 @@ from src.core.clipboard import SecureClipboard
 from src.core.session import SessionManager
 
 def run_app():
+    # Set Windows AppUserModelID so taskbar icon and grouping match SecureVault
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SecureVault.PasswordManager")
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
+    app.setApplicationName("SecureVault")
+    app.setApplicationDisplayName("SecureVault Password Manager")
+    app.setOrganizationName("SecureVault")
+
+    # Set application-wide window icon
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    icon_path = os.path.join(base_dir, "assets", "icon.ico")
+    if not os.path.exists(icon_path):
+        icon_path = os.path.join(base_dir, "assets", "icon.png")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+
     app.setStyleSheet(get_stylesheet())
 
     vault = Vault()
