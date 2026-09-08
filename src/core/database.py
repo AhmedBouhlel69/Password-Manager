@@ -65,18 +65,33 @@ class VaultDatabase:
         Raises:
             DatabaseError: If the database cannot be opened or decrypted.
         """
+        conn = None
         try:
-            self._conn = apsw.Connection(self.path)
+            conn = apsw.Connection(self.path)
             # Set the database encryption key. For sqlite3mc, PRAGMA key must be
             # the first statement executed on a new connection.
-            self._conn.pragma("key", db_passphrase)
-            # Verify we can actually read the database (catches wrong key)
-            # This will raise an error if the key is wrong.
-            self._conn.pragma("cipher_version")
+            conn.pragma("key", db_passphrase)
+            conn.pragma("cipher_version")
+            # cipher_version only reports the available cipher. Reading the
+            # schema is what verifies that the key can decrypt this database.
+            conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
+            self._conn = conn
         except apsw.SQLError as e:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
             self._conn = None
-            raise DatabaseError(f"Failed to open database (wrong key?): {e}") from e
+            raise DatabaseError(
+                f"Failed to open encrypted database (wrong key or corrupted vault): {e}"
+            ) from e
         except Exception as e:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
             self._conn = None
             raise DatabaseError(f"Failed to open database: {e}") from e
 

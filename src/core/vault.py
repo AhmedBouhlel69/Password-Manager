@@ -204,7 +204,10 @@ class Vault:
 
         try:
             db = VaultDatabase(path)
-            db.open(key.hex())
+            try:
+                db.open(key.hex())
+            except DatabaseError as e:
+                raise VaultError("Could not unlock vault: wrong password or corrupted vault") from e
 
             # Verify the key by decrypting the verification token
             token_hex = db.get_meta("verification_token")

@@ -6,7 +6,7 @@ from src.ui.styles import get_stylesheet
 from src.ui.unlock_dialog import UnlockDialog
 from src.ui.main_window import MainWindow
 from src.ui.ble_2fa_dialog import BLE2FADialog
-from src.core.vault import Vault
+from src.core.vault import Vault, VaultError
 from src.core.clipboard import SecureClipboard
 from src.core.session import SessionManager
 
@@ -51,39 +51,41 @@ def run_app():
                 dlg.set_error(str(e))
                 
         def on_unlocked(path, pwd):
-            if vault.unlock(path, pwd):
-                # Enforce Bluetooth 2FA if trusted iPhone is registered
-                devices = vault.get_trusted_devices()
-                if devices:
-                    ble_dlg = BLE2FADialog(vault=vault, parent=dlg)
-                    res = ble_dlg.exec()
-                    if res == 1 and ble_dlg.approved:
-                        dlg.accept()
+            try:
+                if vault.unlock(path, pwd):
+                    # Enforce Bluetooth 2FA if trusted iPhone is registered
+                    devices = vault.get_trusted_devices()
+                    if devices:
+                        ble_dlg = BLE2FADialog(vault=vault, parent=dlg)
+                        res = ble_dlg.exec()
+                        if res == 1 and ble_dlg.approved:
+                            dlg.accept()
+                        else:
+                            vault.lock()
+                            dlg.set_error("Bluetooth 2FA verification not approved. Session ended.")
+                            dlg.reject()
                     else:
-                        vault.lock()
-                        dlg.set_error("Bluetooth 2FA verification not approved. Session ended.")
-                        dlg.reject()
-                else:
-                    dlg.accept()
-            else:
-                dlg.set_error("Invalid password or corrupted vault.")
+                        dlg.accept()
+            except VaultError as e:
+                dlg.set_error(str(e))
 
         def on_imported(path, pwd):
-            if vault.unlock(path, pwd):
-                devices = vault.get_trusted_devices()
-                if devices:
-                    ble_dlg = BLE2FADialog(vault=vault, parent=dlg)
-                    res = ble_dlg.exec()
-                    if res == 1 and ble_dlg.approved:
-                        dlg.accept()
+            try:
+                if vault.unlock(path, pwd):
+                    devices = vault.get_trusted_devices()
+                    if devices:
+                        ble_dlg = BLE2FADialog(vault=vault, parent=dlg)
+                        res = ble_dlg.exec()
+                        if res == 1 and ble_dlg.approved:
+                            dlg.accept()
+                        else:
+                            vault.lock()
+                            dlg.set_error("Bluetooth 2FA verification not approved. Session ended.")
+                            dlg.reject()
                     else:
-                        vault.lock()
-                        dlg.set_error("Bluetooth 2FA verification not approved. Session ended.")
-                        dlg.reject()
-                else:
-                    dlg.accept()
-            else:
-                dlg.set_error("Could not open imported vault.")
+                        dlg.accept()
+            except VaultError as e:
+                dlg.set_error(str(e))
 
         dlg.vault_created.connect(on_created)
         dlg.vault_unlocked.connect(on_unlocked)
